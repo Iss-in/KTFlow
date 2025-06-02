@@ -1,0 +1,11 @@
+
+Django>=4.2
+djangorestframework
+djangorestframework-simplejwt
+python-decouple
+
+psycopg2-binary
+celery
+redis
+gunicorn
+drf-yasg
