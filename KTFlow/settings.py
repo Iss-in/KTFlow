@@ -9,7 +9,7 @@ https://docs.djangoproject.com/en/5.2/topics/settings/
 For the full list of settings and their values, see
 https://docs.djangoproject.com/en/5.2/ref/settings/
 """
-
+import os
 from pathlib import Path
 from datetime import timedelta
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -41,6 +41,7 @@ INSTALLED_APPS = [
     'rest_framework_simplejwt',
     'rest_framework_simplejwt.token_blacklist',
     'authentication',
+    'ktsessions'
 ]
 
 MIDDLEWARE = [
@@ -148,6 +149,16 @@ AUTH_PASSWORD_VALIDATORS = [
     },
 ]
 
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': [
+        'rest_framework_simplejwt.authentication.JWTAuthentication',
+    ],
+    'DEFAULT_PERMISSION_CLASSES': [
+        'rest_framework.permissions.IsAuthenticated',  # Or whatever your default is
+    ],
+}
+
+
 
 # Internationalization
 # https://docs.djangoproject.com/en/5.2/topics/i18n/
@@ -171,3 +182,32 @@ STATIC_URL = 'static/'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
+
+
+# Celery Configuration
+CELERY_BROKER_URL = os.environ.get('CELERY_BROKER_URL', 'redis://localhost:6379/0')
+CELERY_RESULT_BACKEND = os.environ.get('CELERY_RESULT_BACKEND', 'redis://localhost:6379/0')
+
+# Optional: Use Django database as result backend instead of Redis
+# CELERY_RESULT_BACKEND = 'django-db'
+# CELERY_CACHE_BACKEND = 'django-cache'
+
+# Celery Task Settings
+CELERY_ACCEPT_CONTENT = ['json']
+CELERY_TASK_SERIALIZER = 'json'
+CELERY_RESULT_SERIALIZER = 'json'
+CELERY_TIMEZONE = TIME_ZONE  # Use your existing TIME_ZONE setting
+
+# Optional: Task routing and queues
+# CELERY_TASK_ROUTES = {
+#     'ktsessions.tasks.process_attachment': {'queue': 'default'},
+# }
+
+# Optional: Task execution settings
+# CELERY_TASK_ALWAYS_EAGER = False  # Set to True for testing (runs tasks synchronously)
+# CELERY_TASK_EAGER_PROPAGATES = True
+# CELERY_TASK_IGNORE_RESULT = False
+#
+# # Optional: Worker settings
+# CELERY_WORKER_PREFETCH_MULTIPLIER = 1
+# CELERY_TASK_ACKS_LATE = True
