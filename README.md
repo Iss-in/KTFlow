@@ -8,7 +8,7 @@ A Knowledge Sharing Platform based on Django that allows users to create session
 ### running locally 
 - ensure postgres is running locally, and update the default config parameters in settings.py
 - run redis and start celery by `celery -A KTFlow  worker --loglevel=info --concurrency=2` from the project base directory
-- start django app by `python manage.py runserver`
+- start django app by ```python manage.py makemigrations  && python manage.py migrate && python manage.py runserver```
 
 ## sample api usage
 
