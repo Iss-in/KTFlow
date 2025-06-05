@@ -2,6 +2,7 @@ version: '3.9'
 
 services:
   db:
+    container_name: kt_postgres
     image: postgres:14
     environment:
       POSTGRES_DB: postgres
@@ -13,11 +14,13 @@ services:
       - "5432:5432"
 
   redis:
+    container_name: kt_redis
     image: redis:7
     ports:
       - "6379:6379"
 
   django:
+    container_name: kt_server
     build: .
     command: sh -c "python manage.py migrate && python manage.py runserver 0.0.0.0:8000"
     volumes:
@@ -31,6 +34,7 @@ services:
       - .env
 
   celery:
+    container_name: kt_celery
     build: .
     command: celery -A KTFlow worker --loglevel=info --concurrency=2
     volumes:
@@ -41,5 +45,9 @@ services:
     env_file:
       - .env
 
-#volumes:
-#  postgres_data:
+  adminer:
+    container_name: kt_adminer
+    image: adminer
+    restart: always
+    ports:
+      - 8080:8080

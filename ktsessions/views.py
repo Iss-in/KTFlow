@@ -1,14 +1,17 @@
+import uuid
 from rest_framework import generics, permissions, status
 from rest_framework.response import Response
-from rest_framework.decorators import api_view, permission_classes
+from rest_framework.decorators import api_view, permission_classes, authentication_classes
 from django.shortcuts import get_object_or_404
 from django.core.paginator import Paginator
+from django.core.cache import cache  # Redis cache
 
 from .models import KTSession, Attachment
 from .serializers import (
     KTSessionSerializer,
     KTSessionCreateSerializer,
-    KTSessionUpdateSerializer
+    KTSessionUpdateSerializer,
+    SessionPublicSerializer
 )
 from .tasks import process_attachment
 
@@ -45,7 +48,7 @@ def kt_session_detail(request, pk):
     session = get_object_or_404(KTSession, pk=pk, created_by=request.user)
 
     if request.method == 'GET':
-        serializer = KTSessionSerializer(session)
+        serializer = SessionPublicSerializer(session)
         return Response(serializer.data)
 
     elif request.method in ['PUT', 'PATCH']:
@@ -62,19 +65,55 @@ def kt_session_detail(request, pk):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
+@api_view(['GET'])
+@permission_classes([permissions.IsAuthenticated])
+def get_sharing_url(request, pk):
+    """
+    GET: Retrieve sharable URL for a specific KT session
+    """
+
+    try:
+        session = get_object_or_404(KTSession, pk=pk, created_by=request.user)
+        existing_token = None
+        for key in cache.iter_keys('*'):
+            if cache.get(key) == session.id:
+                existing_token = key
+                break
+
+        if existing_token:
+            # Token exists in cache, return it
+            token = existing_token
+        else:
+            # Generate a new token
+            token = str(uuid.uuid4())
+            session.share_token = token
+            session.save(update_fields=['share_token'])
+            cache.set(token, session.id, timeout=60 * 10 )  # 10 minutes TTL
+
+        return Response({'share_url': f'/kt-sessions/get_by_url/{token}'}, status=200)
+    except Exception as e:
+        return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
 # Additional view for sharing via share_token
 @api_view(['GET'])
-def kt_session_by_token(request, share_token):
+@authentication_classes([])  # Disables authentication
+@permission_classes([])      # Disables permission checks
+def kt_session_by_url(request, share_token):
     """
     GET: Retrieve a KT session by share token (public access)
     """
-    session = get_object_or_404(KTSession, share_token=share_token)
-    serializer = KTSessionSerializer(session)
-    return Response(serializer.data)
+    try:
+        session_id = cache.get(share_token)
+        if not session_id:
+            return Response({'error': 'Invalid or expired token'}, status=status.HTTP_404_NOT_FOUND)
 
+        session = get_object_or_404(KTSession, id=session_id)
+        serializer = SessionPublicSerializer(session)
+        return Response(serializer.data)
+    except Exception as e:
+        return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-
-## attachment based code
+## attachment-based code
 @api_view(['POST'])
 def create_attachment(request):
     """Create a new attachment"""
@@ -280,63 +319,3 @@ def delete_attachment(request, attachment_id):
     except Exception as e:
         return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-
-@api_view(['GET'])
-def get_session_attachments(request, session_id):
-    """Get all attachments for a specific session"""
-    try:
-        # Validate session exists
-        session = get_object_or_404(KTSession, id=session_id)
-
-        # Get query parameters (status filtering removed from public API)
-        file_type = request.GET.get('file_type')
-        page = int(request.GET.get('page', 1))
-        per_page = int(request.GET.get('per_page', 10))
-
-        # Build queryset
-        queryset = session.attachments.all()
-
-        # Apply filters (status filtering removed)
-        if file_type:
-            queryset = queryset.filter(file_type=file_type)
-
-        # Order by creation date (newest first)
-        queryset = queryset.order_by('-created_at')
-
-        # Paginate
-        paginator = Paginator(queryset, per_page)
-        page_obj = paginator.get_page(page)
-
-        # Serialize data
-        attachments = []
-        for attachment in page_obj:
-            attachments.append({
-                'id': attachment.id,
-                'file_type': attachment.file_type,
-                'file_url': attachment.file_url,
-                'status': attachment.status,
-                'transcript': attachment.transcript,
-                'summary': attachment.summary,
-                'created_at': attachment.created_at.isoformat()
-            })
-
-        return Response({
-            'session': {
-                'id': session.id,
-                'title': session.title
-            },
-            'attachments': attachments,
-            'pagination': {
-                'page': page,
-                'per_page': per_page,
-                'total_pages': paginator.num_pages,
-                'total_count': paginator.count,
-                'has_next': page_obj.has_next(),
-                'has_previous': page_obj.has_previous()
-            }
-        })
-
-    except ValueError:
-        return Response({'error': 'Invalid page or per_page parameter'}, status=status.HTTP_400_BAD_REQUEST)
-    except Exception as e:
-        return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

@@ -10,3 +10,4 @@ redis
 gunicorn
 drf-yasg
 django-celery-results
+django-redis

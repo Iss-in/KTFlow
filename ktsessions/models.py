@@ -9,7 +9,7 @@ class KTSession(models.Model):
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='kt_sessions'
     )
-    share_token = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
+    share_token = models.UUIDField(null=True, blank=True, unique=True, editable=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
