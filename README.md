@@ -10,6 +10,10 @@ A Knowledge Sharing Platform based on Django that allows users to create session
 - run redis and start celery by `celery -A KTFlow  worker --loglevel=info --concurrency=2` from the project base directory
 - start django app by ```python manage.py makemigrations  && python manage.py migrate && python manage.py runserver```
 
+
+## Postman Collection
+[Collection file](https://gist.github.com/Iss-in/6d5d868fb07fe7dac28cc8a9053f9c87)
+
 ## sample api usage
 
 ### register
